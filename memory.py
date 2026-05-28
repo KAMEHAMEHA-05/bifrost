@@ -21,11 +21,13 @@ class Topic:
 
         self.name = name
 
-        self.subscribers = []
-
         self.maxsize = maxsize
 
         self.messages_published = 0
+
+        self.queue = asyncio.Queue(
+            maxsize=maxsize
+        )
 
 
 class InMemoryBuffer(
@@ -103,7 +105,9 @@ class InMemoryBuffer(
 
         payload
     ):
+
         if self.closed:
+
             raise RuntimeError(
                 "Buffer closed"
             )
@@ -119,19 +123,13 @@ class InMemoryBuffer(
             payload
         )
 
-        subscribers = (
-            self.topics[
-                topic
-            ].subscribers
-        )
-
         self.topics[
             topic
         ].messages_published += 1
 
-        for queue in subscribers:
-
-            await queue.put(msg)
+        await self.topics[
+            topic
+        ].queue.put(msg)
 
 
     async def consume(
@@ -141,26 +139,23 @@ class InMemoryBuffer(
         topic
     ):
 
-        queue = await self.subscribe(
-            topic
-        )
+        if self.closed:
 
-        try:
-
-            while True:
-
-                msg = await queue.get()
-
-                yield msg
-
-        finally:
-
-            await self.unsubscribe(
-
-                topic,
-
-                queue
+            raise RuntimeError(
+                "Buffer closed"
             )
+
+        if topic not in self.topics:
+
+            raise TopicNotFound(topic)
+
+        while True:
+
+            msg = await self.topics[
+                topic
+            ].queue.get()
+
+            yield msg
 
     async def shutdown(self):
 
