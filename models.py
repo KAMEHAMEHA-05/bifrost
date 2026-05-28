@@ -2,10 +2,11 @@ from dataclasses import dataclass
 from typing import Any
 import time
 import uuid
+from pydantic import BaseModel
 
 
 @dataclass
-class Message:
+class Message():
 
     id: str
 
@@ -32,3 +33,15 @@ def create_message(
 
         timestamp=time.time()
     )
+
+
+class TopicRequest(BaseModel):
+
+    name: str
+
+    maxsize: int = 0
+
+
+class PublishRequest(BaseModel):
+
+    payload: Any

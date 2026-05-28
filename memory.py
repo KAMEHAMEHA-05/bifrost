@@ -2,11 +2,11 @@ import asyncio
 
 from collections import defaultdict
 
-from .base import BufferBackend
+from base import BufferBackend
 
-from .models import create_message
+from models import create_message
 
-from .exceptions import (
+from exceptions import (
     TopicNotFound
 )
 
@@ -24,6 +24,8 @@ class Topic:
         self.subscribers = []
 
         self.maxsize = maxsize
+
+        self.messages_published = 0
 
 
 class InMemoryBuffer(
@@ -46,6 +48,10 @@ class InMemoryBuffer(
 
         maxsize=0
     ):
+        if self.closed:
+            raise RuntimeError(
+                "Buffer closed"
+            )
 
         if topic in self.topics:
             return
@@ -64,6 +70,10 @@ class InMemoryBuffer(
 
         topic
     ):
+        if self.closed:
+            raise RuntimeError(
+                "Buffer closed"
+            )
 
         if topic not in self.topics:
 
@@ -93,6 +103,10 @@ class InMemoryBuffer(
 
         payload
     ):
+        if self.closed:
+            raise RuntimeError(
+                "Buffer closed"
+            )
 
         if topic not in self.topics:
 
@@ -111,6 +125,10 @@ class InMemoryBuffer(
             ].subscribers
         )
 
+        self.topics[
+            topic
+        ].messages_published += 1
+
         for queue in subscribers:
 
             await queue.put(msg)
@@ -127,15 +145,84 @@ class InMemoryBuffer(
             topic
         )
 
-        while True:
+        try:
 
-            msg = await queue.get()
+            while True:
 
-            yield msg
+                msg = await queue.get()
 
+                yield msg
+
+        finally:
+
+            await self.unsubscribe(
+
+                topic,
+
+                queue
+            )
 
     async def shutdown(self):
 
         self.closed = True
 
         self.topics.clear()
+
+
+    
+    async def unsubscribe(
+
+        self,
+
+        topic,
+
+        queue
+    ):
+
+        if topic not in self.topics:
+
+            raise TopicNotFound(topic)
+
+        subscribers = self.topics[
+            topic
+        ].subscribers
+
+        if queue in subscribers:
+
+            subscribers.remove(queue)
+
+
+    async def list_topics(self):
+
+        return list(
+            self.topics.keys()
+        )
+    
+
+    async def topic_stats(
+
+        self,
+
+        topic
+    ):
+
+        if topic not in self.topics:
+
+            raise TopicNotFound(topic)
+
+        t = self.topics[topic]
+
+        return {
+
+            "name": t.name,
+
+            "subscribers": len(
+                t.subscribers
+            ),
+
+            "messages_published":
+                t.messages_published,
+
+            "maxsize":
+                t.maxsize
+        }

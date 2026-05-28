@@ -40,3 +40,25 @@ class BufferBackend(ABC):
     @abstractmethod
     async def shutdown(self):
         pass
+
+
+    @abstractmethod
+    async def unsubscribe(
+        self,
+        topic,
+        queue
+    ):
+        pass
+
+
+    @abstractmethod
+    async def list_topics(self):
+        pass
+
+
+    @abstractmethod
+    async def topic_stats(
+        self,
+        topic
+    ):
+        pass
